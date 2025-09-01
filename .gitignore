@@ -1,0 +1,15 @@
+# Environment variables - never commit secrets!
+.env
+
+# Python virtual environment
+venv/
+
+# Large asset folders - these are downloaded from S3
+model/
+data/
+
+# Python cache
+__pycache__/
+
+# OS-specific files
+.DS_Store

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>المستشار القانوني السعودي الذكي</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #005a4a;
+            --secondary-color: #f0f4f8;
+            --text-color: #333;
+            --border-color: #e0e0e0;
+            --user-msg-bg: #e1f5fe;
+            --bot-msg-bg: #ffffff;
+        }
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: var(--secondary-color);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .chat-container {
+            width: 90%;
+            max-width: 800px;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bot-msg-bg);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 {
+            margin: 0;
+            font-size: 1.25rem;
+            flex-grow: 1;
+        }
+        #reset-btn {
+            background: none;
+            border: 1px solid #ffffff55;
+            color: white;
+            padding: 0.4rem 0.8rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background-color 0.2s;
+        }
+        #reset-btn:hover {
+            background-color: #ffffff22;
+        }
+        .chat-box {
+            flex-grow: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        /* ... باقي كود CSS لم يتغير ... */
+        .chat-message { padding: 0.75rem 1.25rem; border-radius: 18px; max-width: 75%; line-height: 1.6; }
+        .user-message { background-color: var(--user-msg-bg); color: #01579b; border-bottom-right-radius: 4px; align-self: flex-end; }
+        .bot-message { background-color: #f1f3f5; border-bottom-left-radius: 4px; align-self: flex-start; }
+        .bot-message p { margin: 0; }
+        .bot-message .sources { margin-top: 1rem; border-top: 1px dashed var(--border-color); padding-top: 0.75rem; }
+        .bot-message .sources details { font-size: 0.9rem; }
+        .bot-message .sources summary { cursor: pointer; font-weight: 500; color: var(--primary-color); }
+        .source-item { font-size: 0.85rem; background: #fafafa; border-right: 3px solid var(--primary-color); padding: 0.5rem; margin-top: 0.5rem; border-radius: 4px; white-space: pre-wrap; }
+        .chat-input-form { display: flex; padding: 1rem; border-top: 1px solid var(--border-color); background-color: #f9fafb; }
+        .chat-input-form input { flex-grow: 1; border: 1px solid var(--border-color); border-radius: 20px; padding: 0.75rem 1rem; font-family: 'Tajawal', sans-serif; font-size: 1rem; border-left: none; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+        .chat-input-form button { background-color: var(--primary-color); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 20px; cursor: pointer; font-size: 1rem; transition: background-color 0.3s ease; border-right: none; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+        .typing-indicator { align-self: flex-start; display: none; }
+        .typing-indicator span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ccc; margin: 0 2px; animation: bounce 1.4s infinite ease-in-out both; }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <header>
+            <button id="reset-btn">محادثة جديدة</button>
+            <h1>المستشار القانوني الذكي</h1>
+        </header>
+        <div class="chat-box" id="chat-box">
+            <!-- سيتم إضافة الرسائل هنا -->
+        </div>
+        <form id="chat-form" class="chat-input-form">
+            <button type="submit">إرسال</button>
+            <input type="text" id="query-input" placeholder="اكتب سؤالك هنا..." autocomplete="off">
+        </form>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const chatForm = document.getElementById('chat-form');
+        const queryInput = document.getElementById('query-input');
+        const resetButton = document.getElementById('reset-btn');
+        
+        let chatHistory = [];
+        // متغير لتخزين مصادر المحادثة الحالية
+        let conversationSources = [];
+
+        function initializeChat() {
+            chatHistory = [];
+            conversationSources = [];
+            chatBox.innerHTML = ''; // مسح الرسائل
+            addMessage({ gpt_answer: "أهلاً بك! كيف يمكنني مساعدتك اليوم؟" }, 'bot');
+        }
+
+        resetButton.addEventListener('click', initializeChat);
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = queryInput.value.trim();
+            if (!query) return;
+
+            addMessage(query, 'user');
+            queryInput.value = '';
+            const typingIndicator = addTypingIndicator();
+
+            try {
+                // بناء الطلب الذي سيتم إرساله
+                const payload = { 
+                    query: query,
+                    history: chatHistory 
+                };
+                
+                // إذا كانت هناك مصادر مخزنة، أضفها للطلب
+                if (conversationSources.length > 0) {
+                    payload.sources = conversationSources;
+                }
+
+                const response = await fetch('/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
+                const data = await response.json();
+
+                typingIndicator.remove();
+                addMessage(data, 'bot');
+
+                // تحديث السجل والمصادر
+                chatHistory.push({ "role": "user", "content": query });
+                chatHistory.push({ "role": "assistant", "content": data.gpt_answer });
+                
+                // إذا كانت هذه هي الإجابة الأولى، قم بتخزين مصادرها
+                if (conversationSources.length === 0 && data.sources) {
+                    conversationSources = data.sources;
+                }
+
+            } catch (error) {
+                typingIndicator.remove();
+                addMessage({ gpt_answer: "عفواً، حدث خطأ. يرجى المحاولة مرة أخرى." }, 'bot');
+                console.error('Error:', error);
+            }
+        });
+
+        function addMessage(data, type) {
+            // ... (نفس دالة addMessage السابقة، لا تغيير هنا) ...
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${type}-message`;
+
+            if (type === 'user') {
+                messageDiv.textContent = data;
+            } else { // bot
+                let sourcesHTML = '';
+                if (data.sources && data.sources.length > 0) {
+                    sourcesHTML = `
+                        <div class="sources">
+                            <details>
+                                <summary>عرض المصادر</summary>
+                                ${data.sources.map((s, i) => `<div class="source-item"><b>المصدر [${i+1}]:</b><br>${s.law_text}</div>`).join('')}
+                            </details>
+                        </div>
+                    `;
+                }
+                messageDiv.innerHTML = `<p>${data.gpt_answer.replace(/\n/g, '<br>')}</p>${sourcesHTML}`;
+            }
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function addTypingIndicator() {
+            // ... (نفس دالة addTypingIndicator السابقة، لا تغيير هنا) ...
+            const indicatorDiv = document.createElement('div');
+            indicatorDiv.className = 'chat-message typing-indicator';
+            indicatorDiv.innerHTML = '<span></span><span></span><span></span>';
+            chatBox.appendChild(indicatorDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return indicatorDiv;
+        }
+
+        // بدء المحادثة عند تحميل الصفحة
+        initializeChat();
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,13 @@
+# We are installing a specific, smaller, CPU-only version of torch to ensure successful installation
+torch @ https://download.pytorch.org/whl/cpu/torch-2.3.1%2Bcpu-cp311-cp311-linux_x86_64.whl
+
+# The rest of the libraries
+Flask
+sentence-transformers
+numpy
+pandas
+scikit-learn
+openai
+python-dotenv
+boto3
+openpyxl
