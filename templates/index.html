@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>المستشار القانوني الذكي</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
+        body { font-family: 'Tajawal', sans-serif; }
+        .chat-container { max-height: calc(100vh - 200px); }
+        .user-msg { background-color: #DBEAFE; color: #1E3A8A; }
+        .assistant-msg { background-color: #F3F4F6; color: #1F2937; }
+        .source-pill {
+            background-color: #E0E7FF; color: #4338CA; border: 1px solid #C7D2FE;
+            transition: all 0.2s ease-in-out;
+        }
+        .source-pill:hover { background-color: #C7D2FE; transform: translateY(-1px); }
+        #source-modal { backdrop-filter: blur(4px); }
+        .feedback-btn {
+            background: none; border: none; cursor: pointer; padding: 2px;
+            opacity: 0.5; transition: opacity 0.2s;
+        }
+        .feedback-btn:hover { opacity: 1; }
+        .feedback-btn.selected { opacity: 1; transform: scale(1.1); }
+        .feedback-container .feedback-btn { pointer-events: auto; }
+        .feedback-container.submitted .feedback-btn { pointer-events: none; opacity: 0.4; }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen text-gray-800">
+    <div class="w-full max-w-4xl mx-auto bg-white rounded-2xl shadow-2xl flex flex-col h-[90vh]">
+        <!-- Header -->
+        <header class="bg-teal-700 text-white p-4 rounded-t-2xl flex justify-between items-center shadow-md">
+            <h1 class="text-xl font-bold">المستشار القانوني الذكي</h1>
+            <button id="new-chat-btn" class="bg-white text-teal-700 hover:bg-gray-200 font-bold py-2 px-4 rounded-lg transition duration-300">
+                محادثة جديدة
+            </button>
+        </header>
+
+        <!-- Chat Area -->
+        <main id="chat-container" class="flex-1 p-6 overflow-y-auto chat-container space-y-6">
+            <!-- Messages will be injected here -->
+        </main>
+
+        <!-- Input Area -->
+        <footer class="p-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+            <form id="chat-form" class="flex items-center space-x-3 rtl:space-x-reverse">
+                <input type="text" id="user-input" placeholder="اسأل عن أي نظام أو قانون سعودي..."
+                       class="flex-1 p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:outline-none transition"
+                       autocomplete="off">
+                <button type="submit" id="send-btn"
+                        class="bg-teal-600 text-white p-3 rounded-xl hover:bg-teal-700 transition duration-300 disabled:bg-gray-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </button>
+            </form>
+        </footer>
+    </div>
+
+    <!-- Source Modal -->
+    <div id="source-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="text-lg font-bold">المصادر المستخدمة</h3>
+                <button id="close-modal-btn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
+            </div>
+            <div id="modal-content" class="overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const newChatBtn = document.getElementById('new-chat-btn');
+        const sourceModal = document.getElementById('source-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const modalContent = document.getElementById('modal-content');
+
+        let conversationId = null;
+
+        const addMessage = (role, text, { sources = [], timestamp = null, feedback = null } = {}) => {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `p-4 rounded-xl max-w-2xl break-words ${role === 'user' ? 'user-msg self-end' : 'assistant-msg self-start'}`;
+            
+            const contentP = document.createElement('p');
+            contentP.innerHTML = text.replace(/\n/g, '<br>');
+            messageDiv.appendChild(contentP);
+
+            if (role === 'assistant') {
+                const controlsContainer = document.createElement('div');
+                controlsContainer.className = 'mt-4 flex items-center justify-between';
+
+                const sourcesBtnContainer = document.createElement('div');
+                if (sources && sources.length > 0) {
+                    const sourcesBtn = document.createElement('button');
+                    sourcesBtn.className = 'text-sm font-bold text-teal-600 hover:underline';
+                    sourcesBtn.textContent = 'عرض المصادر';
+                    sourcesBtn.onclick = () => showSources(sources);
+                    sourcesBtnContainer.appendChild(sourcesBtn);
+                }
+                controlsContainer.appendChild(sourcesBtnContainer);
+
+                if (timestamp) {
+                    const feedbackContainer = document.createElement('div');
+                    feedbackContainer.className = 'feedback-container flex space-x-2 rtl:space-x-reverse';
+                    if (feedback) { feedbackContainer.classList.add('submitted'); }
+
+                    const thumbUpBtn = document.createElement('button');
+                    thumbUpBtn.className = 'feedback-btn';
+                    thumbUpBtn.innerHTML = '👍';
+                    thumbUpBtn.onclick = (e) => sendFeedback(e, 'good', conversationId, timestamp);
+                    if (feedback === 'good') thumbUpBtn.classList.add('selected');
+
+                    const thumbDownBtn = document.createElement('button');
+                    thumbDownBtn.className = 'feedback-btn';
+                    thumbDownBtn.innerHTML = '👎';
+                    thumbDownBtn.onclick = (e) => sendFeedback(e, 'bad', conversationId, timestamp);
+                    if (feedback === 'bad') thumbDownBtn.classList.add('selected');
+                    
+                    feedbackContainer.appendChild(thumbUpBtn);
+                    feedbackContainer.appendChild(thumbDownBtn);
+                    controlsContainer.appendChild(feedbackContainer);
+                }
+                messageDiv.appendChild(controlsContainer);
+            }
+            chatContainer.appendChild(messageDiv);
+            scrollToBottom();
+        };
+        
+        const sendFeedback = async (event, feedbackValue, convId, timestamp) => {
+            const feedbackContainer = event.target.parentElement;
+            if (feedbackContainer.classList.contains('submitted')) return;
+
+            feedbackContainer.classList.add('submitted');
+            event.target.classList.add('selected');
+
+            try {
+                await fetch('/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        conversation_id: convId,
+                        timestamp: timestamp,
+                        feedback: feedbackValue
+                    })
+                });
+            } catch (error) {
+                console.error("Failed to send feedback:", error);
+                feedbackContainer.classList.remove('submitted');
+                event.target.classList.remove('selected');
+            }
+        };
+
+        const showLoadingIndicator = () => {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'loading-indicator';
+            loadingDiv.className = 'assistant-msg self-start p-4 rounded-xl max-w-2xl';
+            loadingDiv.textContent = 'جاري الكتابة...';
+            chatContainer.appendChild(loadingDiv);
+            scrollToBottom();
+        };
+
+        const removeLoadingIndicator = () => {
+            const indicator = document.getElementById('loading-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        };
+
+        const scrollToBottom = () => {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        };
+
+        const showSources = (sources) => {
+            modalContent.innerHTML = '';
+            sources.forEach((source, index) => {
+                const sourceDiv = document.createElement('div');
+                sourceDiv.className = 'mb-4 pb-4 border-b last:border-b-0';
+                const title = document.createElement('h4');
+                title.className = 'font-bold text-teal-700 mb-2';
+                title.textContent = `المصدر [${index + 1}] - (الفهرس الأصلي: ${source.source_index})`;
+                const text = document.createElement('p');
+                text.className = 'text-gray-600';
+                text.textContent = source.law_text;
+                sourceDiv.appendChild(title);
+                sourceDiv.appendChild(text);
+                modalContent.appendChild(sourceDiv);
+            });
+            sourceModal.classList.remove('hidden');
+            sourceModal.classList.add('flex');
+        };
+
+        const loadChatHistory = async (id) => {
+            try {
+                const response = await fetch('/get_chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ conversation_id: id })
+                });
+                if (!response.ok) throw new Error('Failed to load history');
+                
+                const data = await response.json();
+                chatContainer.innerHTML = '';
+                data.history.forEach(msg => {
+                    addMessage(msg.role, msg.content, { 
+                        sources: msg.sources || [], 
+                        timestamp: msg.timestamp,
+                        feedback: msg.feedback
+                    });
+                });
+            } catch (error) {
+                console.error("Error loading chat history:", error);
+                addMessage('assistant', 'عفواً، لم أتمكن من تحميل هذه المحادثة.');
+            }
+        };
+
+        const startNewChat = () => {
+            conversationId = null;
+            chatContainer.innerHTML = '';
+            window.history.pushState({}, '', '/');
+            addMessage('assistant', 'أهلاً بك! كيف يمكنني مساعدتك اليوم؟');
+            userInput.focus();
+        };
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = userInput.value.trim();
+            if (!query) return;
+
+            addMessage('user', query);
+            userInput.value = '';
+            sendBtn.disabled = true;
+            showLoadingIndicator();
+
+            try {
+                const response = await fetch('/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query, conversation_id: conversationId })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.conversation_id && !conversationId) {
+                    conversationId = data.conversation_id;
+                    window.history.pushState({}, '', `?chat_id=${conversationId}`);
+                }
+                
+                removeLoadingIndicator();
+                const latestMsg = data.latest_message;
+                addMessage('assistant', latestMsg.content, {
+                    sources: latestMsg.sources,
+                    timestamp: latestMsg.timestamp
+                });
+
+            } catch (error) {
+                console.error('Error:', error);
+                removeLoadingIndicator();
+                addMessage('assistant', `عفواً، حدث خطأ: ${error.message}`);
+            } finally {
+                sendBtn.disabled = false;
+                userInput.focus();
+            }
+        });
+
+        newChatBtn.addEventListener('click', startNewChat);
+
+        closeModalBtn.addEventListener('click', () => {
+            sourceModal.classList.add('hidden');
+            sourceModal.classList.remove('flex');
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const chatId = urlParams.get('chat_id');
+
+            if (chatId) {
+                conversationId = chatId;
+                loadChatHistory(chatId);
+            } else {
+                startNewChat();
+            }
+        });
+    </script>
+</body>
+</html>
+

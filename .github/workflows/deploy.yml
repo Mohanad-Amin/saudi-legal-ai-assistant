@@ -1,0 +1,44 @@
+name: Deploy to AWS Elastic Beanstalk
+
+on:
+  push:
+    branches:
+      - main 
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1 
+
+      - name: Create ZIP deployment package
+        run: zip -r deploy.zip . -x "venv/*" ".git/*" "model/*" "data/*" ".env"ي
+
+      - name: Upload package to S3 bucket
+        run: |
+          TIMESTAMP=$(date +%s)
+          S3_BUCKET="saudi-law-advisor-assets" 
+          aws s3 cp deploy.zip s3://$S3_BUCKET/deploy-$TIMESTAMP.zip
+
+      - name: Create new Elastic Beanstalk version
+        run: |
+          TIMESTAMP=$(date +%s)
+          S3_BUCKET="saudi-law-advisor-assets" 
+          APPLICATION_NAME="saudi-law-retriever"
+          aws elasticbeanstalk create-application-version --application-name $APPLICATION_NAME --version-label "ver-$TIMESTAMP" --source-bundle S3Bucket=$S3_BUCKET,S3Key=deploy-$TIMESTAMP.zip
+
+      - name: Deploy new version
+        run: |
+          TIMESTAMP=$(date +%s)
+          APPLICATION_NAME="saudi-law-retriever"
+          ENVIRONMENT_NAME="Saudi-law-retriever-env-1" 
+          aws elasticbeanstalk update-environment --application-name $APPLICATION_NAME --environment-name $ENVIRONMENT_NAME --version-label "ver-$TIMESTAMP"
+
