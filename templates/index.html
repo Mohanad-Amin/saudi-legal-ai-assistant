@@ -80,7 +80,7 @@
         const modalContent = document.getElementById('modal-content');
 
         let conversationId = null;
-
+        
         const addMessage = (role, text, { sources = [], timestamp = null, feedback = null } = {}) => {
             const messageDiv = document.createElement('div');
             messageDiv.className = `p-4 rounded-xl max-w-2xl break-words ${role === 'user' ? 'user-msg self-end' : 'assistant-msg self-start'}`;
@@ -175,7 +175,7 @@
         };
 
         const showSources = (sources) => {
-            modalContent.innerHTML = '';
+            modalContent.innerHTML = ''; 
             sources.forEach((source, index) => {
                 const sourceDiv = document.createElement('div');
                 sourceDiv.className = 'mb-4 pb-4 border-b last:border-b-0';
@@ -292,4 +292,5 @@
     </script>
 </body>
 </html>
+
 

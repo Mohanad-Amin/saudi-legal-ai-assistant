@@ -70,7 +70,7 @@ OpenAI API: يعالج الطلب باستخدام GPT-4o ويعيد إجابة 
 git clone [https://github.com/your-username/saudi-law-retriever.git](https://github.com/your-username/saudi-law-retriever.git)
 cd saudi-law-retriever
 
-إنشاء وتفعيل البيئة الافتراضية:
+إنشاء وتفعيل البيئة الاftراضية:
 
 python3 -m venv venv
 source venv/bin/activate
